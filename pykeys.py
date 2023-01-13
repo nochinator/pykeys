@@ -1,11 +1,6 @@
-import ctypes
-import subprocess
 import os
 import win32com.client
-import win32con
-import win32gui
-import win32process
-from pywinauto import application
+from pywinauto import Application
 import keyboard
 import psutil
 
@@ -20,12 +15,16 @@ def load():
     # attempt to locate hotkeys file
     try:
         with open('hotkeys.txt', 'r') as f:
+            # check every line
             for line in f:
                 hotkey = line.split(',')[0]
                 hotkey = hotkey.replace(" ", "+")
+                # register hotkey
                 keyboard.add_hotkey(hotkey, globals()[line.split(',')[1]], args=(line.split(',')[2],))
 
         print('loaded hotkeys at ' + cwd)
+
+    # if it can't find the save then make new save file
     except FileNotFoundError:
         with open('hotkeys.txt', 'x'):
             print('no hotkeys file (did you rename the hotkeys.txt or move it?) new file created')
@@ -33,6 +32,7 @@ def load():
 
 # create new hotkeys
 def create():
+    # get the starter keys from the user
     print('please insert the hotkey starters you would like to use')
     print('they should be in formatted like and in the order as follows')
     print('ctrl alt shift')
@@ -42,24 +42,32 @@ def create():
 
     if starters == "cancel":
         print('hotkey canceled')
+    # check that they are valid starter keys
     elif ("ctrl" in starters or "alt" in starters) and starters in possible_starters:
+        # get the final alphanumeric key
         print('please enter a single alphanumeric key you would like to be used in combination with the starters')
         print('number pad and none alphanumeric keys hotkeys are currently in development')
         key = input().lower()
+        override = False
 
+        # check the hotkey doesn't already exist
         with open('hotkeys.txt', 'r') as f:
             contents = f.read()
             if starters + ' ' + key in contents:
-                key = "exists"
+                print('that hotkey combo already exists')
+                print('do you want to override it? y/n')
+                override = input()
+                if override == 'y':
+                    print('overriding')
+                    override = True
+                else:
+                    key = 'cancel'
 
         if key == "cancel":
             print('hotkey canceled')
 
-        elif key == "exists":
-            print('that hotkey combo already exists')
-
         elif key.isalnum() and len(key) == 1:
-            # this is here as a structure for implementing other features DON'T DELETE IT
+            # this is here as a structure for implementing other features in the future DO NOT DELETE IT
             # print('what do you want this hotkey to do')
             # print('to have it open or, if it is already open, focus an app type "open"')
             # action = input().lower()
@@ -73,12 +81,15 @@ def create():
                 print('if you do not know how to find the path to the file please go to (fill me in).com')
                 path = input()
                 path = r'{}'.format(path)
-                print(path)
-                _, extension = os.path.splitext(path)[1]
+                os.path.isfile(path)
+                if path[-3:] == 'exe':
+                    extension = 'exe'
+                else:
+                    extension = None
 
                 if path == "cancel":
                     print('hotkey canceled')
-                elif extension == '.exe':
+                elif extension == 'exe':
 
                     print('to confirm your hotkey will be "' + starters + ' + ' + key + '" and it will ' + action +
                           ' the app at ' + path)
@@ -87,13 +98,26 @@ def create():
 
                     if answer == "y":
                         path = path.replace('\\', '/')
-                        with open('hotkeys.txt', 'w') as f:
-                            f.seek(0, os.SEEK_END)
-                            hotkey = starters + ' ' + key + ',run,' + path + '\n'
-                            f.write(hotkey)
+                        if not override:
+                            with open('hotkeys.txt', 'a') as f:
+                                f.seek(0, os.SEEK_END)
+                                hotkey = starters + ' ' + key + ',run,' + path + '\n'
+                                f.write(hotkey)
+                        else:
+
+                            with open("hotkeys.txt", "r+") as file:
+                                lines = file.readlines()
+                                for line_number, line in enumerate(lines):
+                                    if starters + ' ' + key in line:
+                                        keyboard.remove_hotkey(starters + ' + ' + key)
+                                        lines[line_number] = starters + ' ' + key + ',run,' + path + '\n'
+                                file.seek(0)
+                                file.writelines(lines)
+                                file.truncate()
+
                         print('hotkey saved')
                         starters = starters.replace(' ', '+')
-                        keyboard.add_hotkey(starters + ' + ' + key, run, args=(path,))
+                        keyboard.add_hotkey(starters + ' + ' + key, run, args=path)
                     else:
                         print('hotkey canceled')
 
@@ -122,29 +146,13 @@ def run(path):
             base = os.path.normcase(proc.exe())
             base = os.path.basename(base)
 
-            path = os.path.normcase(path)
-            path = os.path.basename(path)
-
-            print(base)
-            print(path)
-            if base == path.strip():
-                print('same')
+            path_base = os.path.normcase(path)
+            path_base = os.path.basename(path_base)
+            if base == path_base.strip():
                 found = True
                 pid = proc.pid
-                print(pid)
-
-                def callback(handle, pid_to_match):
-                    _, found_pid = win32process.GetWindowThreadProcessId(handle)
-                    if found_pid == pid_to_match:
-                        return handle
-
-                handle = None
-                win32gui.EnumWindows(callback, pid)
-                print(handle)
-                if handle:
-                    print('yellow')
-                    win32gui.ShowWindow(handle, win32con.SW_SHOWNORMAL)
-                    win32gui.SetForegroundWindow(handle)
+                app = Application().connect(process=pid)
+                app.top_window().set_focus()
                 break
         except psutil.AccessDenied:
             pass
@@ -153,6 +161,24 @@ def run(path):
         print('opening')
         path = path.strip()
         os.startfile(path)
+
+
+def remove_hotkey():
+    print('what are the keys to the hotkey you would like to remove')
+    print('use the format below and replace "key" with the final key in the hotkey')
+    print('ctrl alt shift "key"')
+    keys = input()
+    with open(r'hotkeys.txt', 'r') as f:
+        for line in f:
+            if keys in line:
+                print('are you sure you want to delete the following hotkey? y/n')
+                print(keys + ' that ' + line.split(',')[1] + 's the program at ' + line.split(',')[2])
+                confirm = input()
+                if confirm == 'y':
+                    f.write(line)
+                    keyboard.remove_hotkey(keys)
+                else:
+                    continue
 
 
 load()
@@ -173,15 +199,10 @@ while True:
     elif command == 'reset':
         print('are you sure you want to delete ALL of you hotkeys? y/n')
         if input() == "y":
-            os.remove('hotkeys.txt')
+            open('hotkeys.txt', 'w').close()
             load()
             print('hotkeys reset')
         else:
             print('reset canceled')
-    elif command == 'stop':
-        print('stopping')
-        continue
-    # elif command == 'show':
-    # print(keyboard.)
     else:
         print('invalid command')
