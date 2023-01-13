@@ -21,7 +21,7 @@ III. focusing (bringing to front) an app if it is already open /
   
   4. actualy focus it /
 
-IV. saving hotkey /
+IV. saving hotkey ✔
   
   1. a save format ✔
   
