@@ -14,12 +14,12 @@ II. opening an app if it is not already open ✔
 III. focusing (bringing to front) an app if it is already open /
 
   1. check if app is open ✔
+  
+  2. if its open focus it ✔
 
-  2. get the pid of the app to be opened ✔
+  3. get the pid of the app to be focused ✔
   
-  3. get the handle X
-  
-  4. actualy focus it X
+  4. actualy focus it /
 
 IV. saving hotkey /
   
@@ -27,8 +27,9 @@ IV. saving hotkey /
   
   2. writing the data to disk in a file ✔
   
-  3. saving multiple hotkeys X
-     (this is me just puting it off it should be rather simple)
+  3. saving multiple hotkeys ✔
+  
+  4. removing hotkeys ✔
 
 
 KEY:
