@@ -1,5 +1,10 @@
+import ctypes
 import os
+
+import win32api
 import win32com.client
+import win32gui
+import win32process
 from pywinauto import Application
 import keyboard
 import psutil
@@ -141,6 +146,7 @@ def commands():
 
 def run(path):
     found = False
+    focused = False
     for proc in psutil.process_iter():
         try:
             base = os.path.normcase(proc.exe())
@@ -149,18 +155,40 @@ def run(path):
             path_base = os.path.normcase(path)
             path_base = os.path.basename(path_base)
             if base == path_base.strip():
+                print('found')
                 found = True
                 pid = proc.pid
                 app = Application().connect(process=pid)
-                app.top_window().set_focus()
-                break
+                print('connected')
+                try:
+                    def enum_callback(hwnd, pid):
+                        # Check if the PID of the process associated with the window matches the specified PID
+                        if win32process.GetWindowThreadProcessId(hwnd)[1] == pid:
+                            # Set focus to the window
+                            ctypes.windll.user32.AllowSetForegroundWindow()
+                            win32gui.SetForegroundWindow(hwnd)
+
+                    # Enumerate all top-level windows
+                    win32gui.EnumWindows(enum_callback, pid)
+                    print('thing go good')
+                    focused = True
+                except:
+                    print('thing go bad')
+                    pass
+
         except psutil.AccessDenied:
             pass
-
     if not found:
         print('opening')
         path = path.strip()
         os.startfile(path)
+        focused = True
+
+    if not focused:
+        print('no window for that process found')
+
+    print('done')
+
 
 
 def remove_hotkey():
